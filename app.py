@@ -4,7 +4,7 @@ import requests
 st.set_page_config(page_title="Jev AI Pro Swing Planner", page_icon="📈", layout="wide")
 
 st.title("📈 Jev AI Pro Swing Trading Planner (Standard API Edition)")
-st.write("यो संस्करणमा सर्भरबाट आउने वास्तविक म्यासेज (Response Text) लाई सिधै स्क्रिनमा पारदर्शी रूपमा देखाइएको छ।")
+st.write("यो संस्करणमा OpenRouter Jev AI को लागि आवश्यक अनिवार्य सेक्युरिटी हेडर्स (Strict Headers Fix) मिलाइएको छ।")
 
 # Sidebar - जोखिम र रणनीति सेटिङहरू
 st.sidebar.header("🛡️ जोखिम र रणनीति सेटिङ")
@@ -25,7 +25,7 @@ with col1:
     st.info(
         "💡 **कसरी गर्ने?**\n"
         "१. आफ्नो HTF (4H) र LTF (15M) चार्टको स्क्रिनसट लिनुहोस्।\n"
-        "२. उक्त फोटोलाई **ChatGPT** वा **Google Lens** मा हालेर विवरण निकाल्नुहोस्।\n"
+        "२. उक्त फोटोलाई **ChatGPT** वा **Google Lens** मा हालेर विवरण निकालनाहोस्।\n"
         "३. त्यहाँबाट प्राप्त भएको विवरण (Text) लाई कपी गरेर दायाँपट्टिको बाकसमा पेस्ट गर्नुहोस्।"
     )
     
@@ -38,20 +38,20 @@ with col2:
     st.write("बजारको विवरण यहाँ पेस्ट गर्नुहोस् र हालको मूल्य अंकमा हाल्नुहोस्।")
     
     paste_data = st.text_area("📥 बजारको विवरण यहाँ पेस्ट गर्नुहोस् (Paste Market Text Data Here):", height=180, 
-                              placeholder="Asset: BTC/USDT\nPrice: \$84000...")
+                              placeholder="Asset: SOLUSDT\nPrice: \$116.41\nHTF Trend: Bullish...")
     
     live_price_num = st.number_input("हालको मूल्य अंकमा हाल्नुहोस् (Calculations को लागि):", min_value=0.0, value=116.41, step=0.01)
     
     if st.button("🎯 स्विंग ट्रेड प्लान डिजाइन गर्नुहोस्", use_container_width=True):
         if not api_key:
-            st.error("🔒 Secrets मा OpenRouter API Key भेटिएन! कृपया पहिले Settings मा थप्नुहोस्।")
+            st.error("🔒 Secrets मा OpenRouter API Key भेटिएन! कृपया पहिले थप्नुहोस्।")
         elif not paste_data:
             st.warning("⚠️ कृपया पहिले बजारको डेटा (Text) यहाँ पेस्ट गर्नुहोस्।")
         else:
             with st.spinner("Jev AI ले रणनीति तयार पार्दैछ..."):
                 combined_state = paste_data + f"\nAdditional Context: {extra_notes}"
                 
-                # ओपनराउटर जेभ एआईको स्ट्यान्डर्ड निर्णय ढाँचा
+                # Jev AI (Strict Response Formatting) Payload
                 jev_payload = {
                     "model": "typesafe/jev-1.13", 
                     "state": combined_state,
@@ -77,20 +77,21 @@ with col2:
                     }
                 }
                 
+                # --- मुख्य फिक्स: OpenRouter ले अनिवार्य रूपमा माग्ने सेक्युरिटी हेडर्स ---
                 headers = {
                     "Authorization": f"Bearer {api_key}", 
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://streamlit.io",  # अनिवार्य हेडर १
+                    "X-Title": "Jev AI Trading Bot"         # अनिवार्य हेडर २
                 }
                 
                 try:
                     res_raw = requests.post("https://openrouter.ai", json=jev_payload, headers=headers)
                     
-                    # यदि सर्भरले सफल कोड दिएन भने सिधै टेक्स्ट देखाउने
                     if res_raw.status_code != 200:
                         st.error(f"❌ OpenRouter API Error ({res_raw.status_code}): {res_raw.text}")
                         st.stop()
                         
-                    # डाटा पार्स गर्ने प्रयास
                     try:
                         res = res_raw.json()
                     except Exception:
@@ -98,14 +99,13 @@ with col2:
                         st.code(res_raw.text)
                         st.stop()
                     
-                    # यदि प्राप्त JSON मा त्रुटि सन्देश छ भने
                     if "error" in res:
                         st.error(f"❌ सर्भर त्रुटि: {res['error'].get('message', res['error'])}")
                         st.stop()
                         
+                    # लचिलो रेस्पोन्स पार्सिङ
                     answers = res.get('answers', res.get('questions', res))
                     
-                    # साँचो कुञ्जीहरू सुरक्षित रूपमा तान्ने
                     dec_obj = answers.get('decision', {})
                     dec = dec_obj.get('choice', dec_obj.get('value', 'NO_TRADE'))
                     
@@ -118,6 +118,7 @@ with col2:
                     st.markdown(f"### Jev AI को निर्णय: **{dec}**")
                     st.write(f"**AI Metrics:** Confidence: `{conf_prob * 100:.1f}%` | Risk Matrix: `{risk}`")
                     st.markdown("---")
+                    st.markdown("### 💡 Jev AI अतिरिक्त व्यापारिक सुझाव (Trading Suggestions):")
                     
                     if dec == "NO_TRADE":
                         st.warning("⚠️ Jev AI ले अहिले बजार सुरक्षित नभएकाले ट्रेड नलिन (NO_TRADE) सुझाव दिएको छ।")

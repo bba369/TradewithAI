@@ -43,7 +43,7 @@ with col2:
         if not api_key:
             st.error("🔒 त्रुटि: Streamlit Secrets मा OpenRouter API Key भेटिएन! कृपया Settings मा चेक गर्नुहोस्।")
         else:
-            with St.spinner("Jev AI ले रणनीति गणना गर्दैछ..."):
+            with st.spinner("Jev AI ले रणनीति गणना गर्दैछ..."):
                 swing_state = (
                     f"Asset Symbol: {asset_choice}\n"
                     f"Current Live Price: \${live_price_input:,.2f}\n"

@@ -24,7 +24,7 @@ col1, col2 = st.columns(2, gap="large")
 # ==================== STEP 1 FRAME (देब्रेपट्टि) ====================
 with col1:
     st.markdown("### 🔍 चरण १: चार्ट अपलोड र डेटा एक्सट्र्याक्सन (Vision AI)")
-    st.write("हायर टाइमफ्रेम (HTF) र लोअर TIME FRAME (LTF) को स्क्रिनसट हाल्नुहोस्।")
+    st.write("हायर टाइमफ्रेम (HTF) र लोअर टाइमफ्रेम (LTF) को स्क्रिनसट हाल्नुहोस्।")
     
     htf_file = st.file_uploader("१. हायर टाइमफ्रेम फोटो हाल्नुहोस् (HTF - जस्तै: 4H/1D चार्ट)", type=["jpg", "jpeg", "png"])
     ltf_file = st.file_uploader("२. लोअर टाइमफ्रेम फोटो हाल्नुहोस् (LTF - जस्तै: 5M/15M चार्ट)", type=["jpg", "jpeg", "png"])
@@ -32,11 +32,12 @@ with col1:
     
     if st.button("🤖 फोटोबाट डेटा निकाल्नुहोस्", use_container_width=True):
         if not api_key:
-            st.error("🔒 Secrets मा OpenRouter API Key भेटिएन!")
+            st.error("🔒 Secrets मा OpenRouter API Key भेटिएन! कृपया पहिले थप्नुहोस्।")
         elif not htf_file or not ltf_file:
             st.warning("⚠️ कृपया HTF र LTF दुवै चार्टको फोटो अपलोड गर्नुहोस्।")
         else:
             with st.spinner("Vision AI ले चार्टका फोटोहरू पढ्दैछ..."):
+                # तस्विरहरू रिड गरेर Base64 स्ट्रिङ बनाउने
                 htf_base64 = base64.b64encode(htf_file.read()).decode('utf-8')
                 ltf_base64 = base64.b64encode(ltf_file.read()).decode('utf-8')
                 
@@ -55,6 +56,7 @@ with col1:
                 Keep it concise and structured.
                 """
                 
+                # --- ओपनराउटर मल्टिमोडल (OpenRouter Multimodal API) को सही मानक संरचना ---
                 payload = {
                     "model": "google/gemini-2.5-flash",
                     "messages": [
@@ -69,18 +71,26 @@ with col1:
                     ]
                 }
                 
-                headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+                headers = {
+                    "Authorization": f"Bearer {api_key}", 
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://streamlit.io", # OpenRouter Leaderboard Requirement
+                    "X-Title": "Swing Trading Assistant"
+                }
                 
                 try:
                     response = requests.post("https://openrouter.ai", json=payload, headers=headers)
+                    
+                    # पहिले HTTP स्थिति २०० (OK) छ कि छैन जाँच गर्ने ताकि JSONDecodeError नआओस्
                     if response.status_code == 200:
-                        raw_data = response.json()['choices'][0]['message']['content']
+                        res_json = response.json()
+                        raw_data = res_json['choices'][0]['message']['content']
                         st.success("✅ फोटोबाट डेटा सफलतापूर्वक निकालियो!")
                         st.text_area("📋 यो डेटा कपी गर्नुहोस् (Copy this output):", value=raw_data, height=250)
                     else:
-                        st.error(f"Vision Error ({response.status_code}): {response.text}")
+                        st.error(f"सर्भर त्रुटि ({response.status_code}): {response.text}")
                 except Exception as e:
-                    st.error(f"सञ्चार त्रुटि: {str(e)}")
+                    st.error(f"सञ्चार त्रुटि (API Connection Error): {str(e)}")
 
 # ==================== STEP 2 FRAME (दायाँपट्टि) ====================
 with col2:
@@ -125,23 +135,19 @@ with col2:
                 headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
                 
                 try:
-                    res_raw = requests.post("https://openrouter.ai", json=jev_payload, headers=headers)
+                    res_raw = requests.post("https://openrouter.ai/api/alpha/decisions", json=jev_payload, headers=headers)
                     if res_raw.status_code == 200:
                         res = res_raw.json()
                         
-                        # --- लचिलो रेस्पोन्स म्यापिङ (Flexible Parsing Solution) ---
-                        # ओपनराउटर वा जेभले जहाँ डाटा पठाए पनि सुरक्षित रूपमा तान्ने
+                        # लचिलो रेस्पोन्स म्यापिङ
                         answers = res.get('answers', res.get('questions', res))
                         
-                        # निर्णय (Decision Value) निकाल्ने
                         dec_obj = answers.get('decision', {})
                         dec = dec_obj.get('choice', dec_obj.get('value', 'NO_TRADE'))
                         
-                        # कन्फिडेन्स (Confidence Probability) निकाल्ने
                         conf_obj = answers.get('confidence', {})
                         conf_prob = conf_obj.get('probability', 0.5)
                         
-                        # रिस्क स्कोर (Risk Score) निकाल्ने
                         risk_obj = answers.get('risk_mode', {})
                         risk = risk_obj.get('value_label', risk_obj.get('value', 'Moderate'))
                         
@@ -159,7 +165,7 @@ with col2:
                             st.info(f"🛡️ **ब्रेक-इभन (Break-Even):** मूल्य \${be:,.2f} पुगेपछि SL लाई इन्ट्री मूल्यमा सार्नुहोस्।")
                             st.warning(f"🔄 **ट्रेलिङ स्टप:** {trail_pct}% Trailing Stop सक्रिय भयो।")
                         else:
-                            st.warning("⚠️ Jev AI ले अहिले बजार सुरक्षित नभएकाले ट्रेड नलिन (NO_TRADE) सुझाव दिएको है।")
+                            st.warning("⚠️ Jev AI ले अहिले बजार सुरक्षित नभएकाले ट्रेड नलिन (NO_TRADE) सुझाव दिएको छ।")
                     else:
                         st.error(f"Jev AI API Error ({res_raw.status_code}): {res_raw.text}")
                 except Exception as e:

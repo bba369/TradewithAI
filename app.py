@@ -3,15 +3,15 @@ import streamlit.components.v1 as components
 import requests
 
 st.set_page_config(page_title="Jev AI Swing Planner", page_icon="📈", layout="wide")
-st.title("📈 Jev AI Pro Swing Trading Planner (Secure Edition)")
-st.write("यो एडिसनमा तपाईंको OpenRouter API Key पूर्ण रूपमा सुरक्षित र लुकेको छ।")
+st.title("📈 Jev AI Pro Swing Trading Planner (Stable Edition)")
+st.write("यो एडिसनमा OpenRouter को आधिकारिक Jev 1.13 स्थिर मोडेल जडान गरिएको छ।")
 
-# Sidebar - एसेट र रिस्क सेटिङहरू मात्र (API Key बक्स हटाइयो)
+# Sidebar - एसेट र रिस्क सेटिङहरू
 asset_choice = st.sidebar.selectbox("क्रिप्टो एसेट छान्नुहोस्", ["Bitcoin (BTC)", "Ethereum (ETH)", "Solana (SOL)"])
 rr_ratio = st.sidebar.slider("रिस्क-रिवार्ड रेसियो (Risk:Reward)", 1.5, 4.0, 2.0, 0.5)
 trail_pct = st.sidebar.slider("ट्रेलिङ स्टप प्रतिशत (Trailing Stop %)", 1.0, 5.0, 2.0, 0.5)
 
-# ब्याकइन्डबाट गोप्य रूपमा API Key तान्ने तरिका
+# Streamlit Secrets बाट API Key तान्ने
 try:
     api_key = st.secrets["OPENROUTER_API_KEY"]
 except Exception:
@@ -23,7 +23,7 @@ tv_symbol = symbol_map[asset_choice]
 col1, col2 = st.columns([1.2, 1])
 
 with col1:
-    st.subheader(f"📊 {asset_choice} लाइभ चार्ट र डेटा म्याट्रिक्स")
+    st.subheader(f"📊 {asset_choice} लाइभ चार्ट")
     tv_widget = f"""
     <div class="tradingview-widget-container" style="width:100%; height:450px;">
       <iframe src="https://tradingview.com{tv_symbol}&interval=D&hidesidetoolbar=1&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=%5B%5D&theme=light&style=1&timezone=Etc%2FUTC&studies_overrides=%7B%7D&overrides=%7B%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&locale=en" style="width: 100%; height: 100%; border: none;"></iframe>
@@ -31,39 +31,46 @@ with col1:
     """
     components.html(tv_widget, height=460)
     
-    st.info("💡 माथिको चार्टमा हेरेर हालको मूल्य र ट्रेन्ड तल भर्नुहोस्।")
+    st.info("💡 माथिको चार्ट हेरेर हालको मूल्य र प्रवृत्ति तल भर्नुहोस्।")
     live_price_input = st.number_input("चार्टमा देखिएको हालको मूल्य (Live Price) हाल्नुहोस्:", min_value=0.0, value=84000.0)
     market_trend_input = st.selectbox("बजारको ट्रेन्ड (Trend)", ["Upward (उकालो)", "Downward (ओरालो)", "Sideways (तेर्सो)"])
-    extra_notes = st.text_area("थप इन्डिकेटरहरू (वैकल्पिक)", value="RSI is healthy, price near daily support.")
+    extra_notes = st.text_area("थप इन्डिकेटरहरू (वैकल्पिक)", value="RSI is healthy, price near support.")
 
 with col2:
     st.subheader("🤖 Jev AI स्विंग निर्णय इन्जिन")
     
     if st.button("🎯 स्विंग ट्रेड प्लान डिजाइन गर्नुहोस्", use_container_width=True):
         if not api_key:
-            st.error("🔒 त्रुटि: Streamlit Secrets मा API Key भेटिएन! कृपया चरण २ पूरा गर्नुहोस्।")
+            st.error("🔒 त्रुटि: Streamlit Secrets मा OpenRouter API Key भेटिएन! कृपया Settings मा चेक गर्नुहोस्।")
         else:
-            with st.spinner("Jev AI ले रणनीति तयार पार्दैछ..."):
+            with st.spinner("Jev AI ले रणनीति गणना गर्दैछ..."):
                 swing_state = (
                     f"Asset Symbol: {asset_choice}\n"
                     f"Current Live Price: \${live_price_input:,.2f}\n"
-                    f"User Observed Trend: {market_trend_input}\n"
-                    f"Technical Indicators: {extra_notes}\n"
+                    f"Market Trend: {market_trend_input}\n"
+                    f"Technical Metrics: {extra_notes}\n"
                 )
                 
+                # १. स्थिर Model ID र Decisions API संरचना
                 jev_payload = {
-                    "model": "typesafe/jev-latest",
+                    "model": "typesafe/jev-1.13", 
                     "state": swing_state,
                     "questions": {
                         "decision": {"type": "choice", "instructions": "Is this a high-quality swing trade setup?", "choices": ["SWING_BUY", "SWING_SELL", "NO_TRADE"]},
-                        "confidence": {"type": "noul", "instructions": "High confidence?"},
+                        "confidence": {"type": "noul", "instructions": "High confidence probability?"},
                         "risk_mode": {"type": "score", "instructions": "Rate market risk", "criteria": ["Conservative", "Moderate", "Aggressive", "Extreme"]}
                     }
                 }
-                headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+                
+                headers = {
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                }
                 
                 try:
-                    response = requests.post("https://openrouter.ai", json=jev_payload, headers=headers)
+                    # २. सही आधिकारिक Decisions API Endpoint कल गर्ने
+                    response = requests.post("https://openrouter.ai/api/alpha/decisions", json=jev_payload, headers=headers)
+                    
                     if response.status_code == 200:
                         res = response.json()
                         dec = res['questions']['decision']['value']
@@ -82,10 +89,10 @@ with col2:
                             st.success(f"🎯 **स्टप लस (SL):** \${sl:,.2f}")
                             st.success(f"🎯 **टेक प्रोफिट (TP):** \${tp:,.2f}")
                             st.info(f"🛡️ **ब्रेक-इभन (Break-Even):** मूल्य \${be:,.2f} पुगेपछि SL लाई इन्ट्री मूल्यमा सार्नुहोस्।")
-                            st.warning(f"🔄 **ट्रेलिङ स्टप:** {trail_pct}% Trailing Stop एक्टिभेट भयो।")
+                            st.warning(f"🔄 **ट्रेलिङ स्टप:** {trail_pct}% Trailing Stop सक्रिय भयो।")
                         else:
-                            st.warning("⚠️ Jev AI ले अहिले ट्रेड नलिन (NO_TRADE) सुझाव दिएको छ।")
+                            st.warning("⚠️ Jev AI ले अहिले बजार जोखिमपूर्ण भएकाले ट्रेड नलिन (NO_TRADE) सुझाव दिएको छ।")
                     else:
-                        st.error(f"Jev AI Error: {response.text}")
+                        st.error(f"सर्भर प्रतिक्रिया त्रुटि ({response.status_code}): {response.text}")
                 except Exception as e:
-                    st.error(f"Request Error: {str(e)}")
+                    st.error(f"सञ्चार त्रुटि (Connection Error): {str(e)}")

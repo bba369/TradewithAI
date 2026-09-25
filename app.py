@@ -3,8 +3,8 @@ import requests
 
 st.set_page_config(page_title="Jev AI Pro Swing Planner", page_icon="📈", layout="wide")
 
-st.title("📈 Jev AI Pro Swing Trading Planner (Ultimate Fix)")
-st.write("यो एडिसनमा सर्भरको जुनसुकै प्रतिक्रिया (HTML/JSON) लाई सुरक्षित रूपमा ह्यान्डल गरिएको छ।")
+st.title("📈 Jev AI Pro Swing Trading Planner (With Pro Suggestions)")
+st.write("यो एडिसनमा Jev AI को निर्णय अनुसार ट्रेडरका लागि विशेष व्यावहारिक सुझावहरू (Trading Suggestions) थप गरिएको छ।")
 
 # Sidebar - जोखिम र रणनीति सेटिङहरू
 st.sidebar.header("🛡️ जोखिम र रणनीति सेटिङ")
@@ -41,7 +41,7 @@ with col2:
     paste_data = st.text_area("📥 बजारको विवरण यहाँ पेस्ट गर्नुहोस् (Paste Market Text Data Here):", height=180, 
                               placeholder="Asset: BTC/USDT\nPrice: \$84000...")
     
-    live_price_num = st.number_input("हालको मूल्य अंकमा हाल्नुहोस् (Calculations को लागि):", min_value=0.0, value=84248.0, step=1.0)
+    live_price_num = st.number_input("हालको मूल्य अंकमा हाल्नुहोस् (Calculations को लागि):", min_value=0.0, value=116.41, step=0.01)
     
     if st.button("🎯 स्विंग ट्रेड प्लान डिजाइन गर्नुहोस्", use_container_width=True):
         if not api_key:
@@ -83,19 +83,15 @@ with col2:
                 }
                 
                 try:
-                    res_raw = requests.post("https://openrouter.ai/api/alpha/decisions", json=jev_payload, headers=headers)
+                    res_raw = requests.post("https://openrouter.ai", json=jev_payload, headers=headers)
                     
-                    # --- मुख्य फिक्स: पहिले रेस्पोन्स टेक्स्ट हो कि JSON हो जाँच्ने (Ultimate Format Safeguard) ---
                     try:
                         res = res_raw.json()
                     except Exception:
-                        # यदि सर्भरले HTML एरर पठायो भने सिधै म्यासेज देखाउने
                         st.error(f"❌ OpenRouter सर्भर एरर ({res_raw.status_code}): खातामा ब्यालेन्स/क्रेडिट नभएको वा API Key बिग्रिएको हुन सक्छ।")
-                        st.warning("💡 कृपया openrouter.ai/dashboard मा गई ब्यालेन्स चेक गर्नुहोस्। न्यू एकाउन्टमा \$0 ब्यालेन्स हुँदा जेभ एआई चल्दैन।")
                         st.stop()
                     
                     if res_raw.status_code == 200:
-                        # लचिलो रेस्पोन्स म्यापिङ (Flexible Parsing)
                         answers = res.get('answers', res.get('questions', res))
                         
                         dec_obj = answers.get('decision', {})
@@ -110,18 +106,51 @@ with col2:
                         st.markdown(f"### Jev AI को निर्णय: **{dec}**")
                         st.write(f"**AI Metrics:** Confidence: `{conf_prob * 100:.1f}%` | Risk Matrix: `{risk}`")
                         
-                        if dec in ["SWING_BUY", "SWING_SELL"]:
+                        st.markdown("---")
+                        st.markdown("### 💡 Jev AI अतिरिक्त व्यापारिक सुझाव (Trading Suggestions):")
+                        
+                        if dec == "NO_TRADE":
+                            st.warning("⚠️ **Jev AI ले अहिले बजार सुरक्षित नभएकाले ट्रेड नलिन (NO_TRADE) सुझाव दिएको छ।**")
+                            st.info(
+                                "📌 **Pro Suggestions for NO_TRADE:**\n"
+                                f"- **पर्ख र हेर (Wait & Watch):** Jev को विश्वास केवल {conf_prob * 100:.1f}% मात्र छ। बजारमा अहिले 'Volume Compression' र 'Sideways Choppiness' भएकाले कुनै पनि दिशा निश्चित छैन। जबरजस्ती ट्रेड नलिनुहोस्।\n"
+                                "- **सपोर्ट/रेजिस्टेन्स ब्रेकआउट पर्खिनुहोस्:** मूल्यलाई अघिल्लो स्विंग हाई (SOL को लागि \$११८-१२०) भन्दा माथि वा बलियो सपोर्ट (११४) भन्दा तल स्पष्ट रूपमा निस्कन दिनुहोस्।\n"
+                                "- **पूंजी सुरक्षित राख्नुहोस्:** बजार चौपी (Choppy) भएको बेला ट्रेडिङ शुल्क र साना स्टप-लस बारम्बार हिट भएर पैसा नाश हुन सक्छ। उत्तम सेटअप नआएसम्म ढुक्कसँग बस्नुहोस्।"
+                            )
+                        
+                        elif dec == "SWING_BUY":
                             sl_buffer = live_price_num * 0.02 
-                            sl = live_price_num - sl_buffer if dec == "SWING_BUY" else live_price_num + sl_buffer
-                            tp = live_price_num + (sl_buffer * rr_ratio) if dec == "SWING_BUY" else live_price_num - (sl_buffer * rr_ratio)
-                            be = live_price_num + (sl_buffer * 0.5) if dec == "SWING_BUY" else live_price_num - (sl_buffer * 0.5)
+                            sl = live_price_num - sl_buffer
+                            tp = live_price_num + (sl_buffer * rr_ratio)
+                            be = live_price_num + (sl_buffer * 0.5)
                             
-                            st.success(f"🎯 **स्टप लस (SL):** \${sl:,.2f}")
-                            st.success(f"🎯 **टेक प्रोफिट (TP):** \${tp:,.2f}")
-                            st.info(f"🛡️ **ब्रेक-इभन (Break-Even):** मूल्य \${be:,.2f} पुगेपछि SL लाई इन्ट्री मूल्यमा सार्नुहोस्।")
+                            st.success(f"🎯 **स्टप लस (SL):** \${sl:,.3f}")
+                            st.success(f"🎯 **टेक प्रोफिट (TP):** \${tp:,.3f}")
+                            st.info(f"🛡️ **ब्रेक-इभन (Break-Even):** मूल्य \${be:,.3f} पुगेपछि SL लाई इन्ट्री मूल्यमा सार्नुहोस्।")
                             st.warning(f"🔄 **ट्रेलिङ स्टप:** {trail_pct}% Trailing Stop सक्रिय भयो।")
-                        else:
-                            st.warning("⚠️ Jev AI ले अहिले बजार सुरक्षित नभएकाले ट्रेड नलिन (NO_TRADE) सुझाव दिएको छ।")
+                            
+                            st.info(
+                                "📌 **Pro Suggestions for SWING_BUY:**\n"
+                                "- **इन्ट्री नियम:** मूल्य वर्तमान स्तरमा स्थिर रहेमा मात्र थोरै परिमाण (Risk Capital को १-२%) बाट खरिद सुरु गर्नुहोस्।\n"
+                                "- **कन्फर्मेसन:** यदि मूल्य ब्रेक-इभन विन्दु भन्दा माथि जान्छ भने मात्र थप पोजिसन (Scale-In) थप्नुहोस्।"
+                            )
+                            
+                        elif dec == "SWING_SELL":
+                            sl_buffer = live_price_num * 0.02 
+                            sl = live_price_num + sl_buffer
+                            tp = live_price_num - (sl_buffer * rr_ratio)
+                            be = live_price_num - (sl_buffer * 0.5)
+                            
+                            st.success(f"🎯 **स्टप लस (SL):** \${sl:,.3f}")
+                            st.success(f"🎯 **टेक प्रोफिट (TP):** \${tp:,.3f}")
+                            st.info(f"🛡️ **ब्रेक-इभन (Break-Even):** मूल्य \${be:,.3f} पुगेपछि SL लाई इन्ट्री मूल्यमा सार्नुहोस्।")
+                            st.warning(f"🔄 **ट्रेलिङ स्टप:** {trail_pct}% Trailing Stop सक्रिय भयो।")
+                            
+                            st.info(
+                                "📌 **Pro Suggestions for SWING_SELL:**\n"
+                                "- **सर्ट सेलिङ नियम:** १५ मिनेटको चार्टमा बेरिस मोमेन्टम (Bearish Crossover) पुष्टी भइरहेकाले यो योजना बनेको हो।\n"
+                                "- **सतर्कता:** ओभरनाइट (Overnight) पोजिसन होल्ड गर्दा बजारमा अचानक आउने शर्ट-स्क्विज (Short Squeeze) बाट बच्न SL कडा रूपमा लागू गर्नुहोस्।"
+                            )
                     else:
                         st.error(f"Jev AI API Error ({res_raw.status_code}): {res}")
                 except Exception as e:

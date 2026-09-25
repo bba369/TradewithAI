@@ -3,10 +3,10 @@ import streamlit.components.v1 as components
 import requests
 
 st.set_page_config(page_title="Jev AI Swing Planner", page_icon="📈", layout="wide")
-st.title("📈 Jev AI Pro Swing Trading Planner (Stable Edition)")
-st.write("यो एडिसनमा OpenRouter को आधिकारिक Jev 1.13 स्थिर मोडेल जडान गरिएको छ।")
+st.title("📈 Jev AI Pro Swing Trading Planner (Production Ready)")
+st.write("यो संस्करणमा OpenRouter Jev AI को कडा JSON संरचना (Strict Schema Fix) मिलाइएको छ।")
 
-# Sidebar - एसेट र रिस्क सेटिङहरू
+# Sidebar - सेटिङहरू
 asset_choice = st.sidebar.selectbox("क्रिप्टो एसेट छान्नुहोस्", ["Bitcoin (BTC)", "Ethereum (ETH)", "Solana (SOL)"])
 rr_ratio = st.sidebar.slider("रिस्क-रिवार्ड रेसियो (Risk:Reward)", 1.5, 4.0, 2.0, 0.5)
 trail_pct = st.sidebar.slider("ट्रेलिङ स्टप प्रतिशत (Trailing Stop %)", 1.0, 5.0, 2.0, 0.5)
@@ -43,7 +43,7 @@ with col2:
         if not api_key:
             st.error("🔒 त्रुटि: Streamlit Secrets मा OpenRouter API Key भेटिएन! कृपया Settings मा चेक गर्नुहोस्।")
         else:
-            with st.spinner("Jev AI ले रणनीति गणना गर्दैछ..."):
+            with St.spinner("Jev AI ले रणनीति गणना गर्दैछ..."):
                 swing_state = (
                     f"Asset Symbol: {asset_choice}\n"
                     f"Current Live Price: \${live_price_input:,.2f}\n"
@@ -51,14 +51,29 @@ with col2:
                     f"Technical Metrics: {extra_notes}\n"
                 )
                 
-                # १. स्थिर Model ID र Decisions API संरचना
+                # Jev AI को कडा JSON नियम (Schema Fix) अनुसार Payload
                 jev_payload = {
                     "model": "typesafe/jev-1.13", 
                     "state": swing_state,
                     "questions": {
-                        "decision": {"type": "choice", "instructions": "Is this a high-quality swing trade setup?", "choices": ["SWING_BUY", "SWING_SELL", "NO_TRADE"]},
-                        "confidence": {"type": "noul", "instructions": "High confidence probability?"},
-                        "risk_mode": {"type": "score", "instructions": "Rate market risk", "criteria": ["Conservative", "Moderate", "Aggressive", "Extreme"]}
+                        "decision": {
+                            "type": "choice", 
+                            "instructions": "Is this a high-quality swing trade setup?", 
+                            "criteria": {
+                                "SWING_BUY": "Good setup to buy and hold for a multi-day upward move.",
+                                "SWING_SELL": "Good setup to short or sell for a multi-day downward move.",
+                                "NO_TRADE": "The market is too choppy, unclear, or risky to enter right now."
+                            }
+                        },
+                        "confidence": {
+                            "type": "noul", 
+                            "instructions": "Is the confidence of this signal high?"
+                        },
+                        "risk_mode": {
+                            "type": "score", 
+                            "instructions": "Rate current market risk for overnight position holding", 
+                            "criteria": ["Conservative", "Moderate", "Aggressive", "Extreme"]
+                        }
                     }
                 }
                 
@@ -68,8 +83,7 @@ with col2:
                 }
                 
                 try:
-                    # २. सही आधिकारिक Decisions API Endpoint कल गर्ने
-                    response = requests.post("https://openrouter.ai/api/alpha/decisions", json=jev_payload, headers=headers)
+                    response = requests.post("https://openrouter.ai", json=jev_payload, headers=headers)
                     
                     if response.status_code == 200:
                         res = response.json()
